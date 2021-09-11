@@ -74,7 +74,17 @@ function updateProfile () {
 					onlinetext.innerText += ` • В Сети`;
 					onlinetext.style.color = '#00aa44';
 				}
-				else onlinetext.innerText += ` • Последний раз в сети ${onlinedifference} минут назад`;
+				else {
+					let months = [
+						'января', 'февраля', 'марта', 'апреля',
+						'мая', 'июня', 'июля', 'августа',
+						'сентября', 'октября', 'ноября', 'декабря'
+					]
+					onlinetext.innerText += ` • Был в сети `;
+					if(onlinedifference < 60) onlinetext.innerText += `${onlinedifference} минут назад`;
+					else if(onlinedifference < 60*24) onlinetext.innerText += `${onlinedifference} часов назад`;
+					else onlinetext.innerText += `${response.lastActive.day} ${months[response.lastActive.month]} ${months[response.lastActive.year]} года`;
+				}
 			}
 			document.querySelector('.group').appendChild(onlinetext);
 		}
@@ -83,30 +93,38 @@ function updateProfile () {
 
 function createAccount () {
 	if(!window.location.pathname.includes('568927438')) return;
-	if(!document.querySelector('.profile-name')) return;
+	
+	getSession((session) => {
+		if(!session.user) return;
+		let getuserreq = new XMLHttpRequest();
+		getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
+		getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		getuserreq.send();
+		getuserreq.onreadystatechange = function() {
+			let json;
+			try {
+				json = JSON.parse(getuserreq.responseText);
+			} catch {
+				json = {}
+			}
+			console.log('AAAAAAAA', !json.role);
+			if(getuserreq.status == 200) getuserreq.onreadystatechange = null;
+			if (getuserreq.status === 200 && !json.role) {
+				document.querySelector('#view').innerHTML = `
+				<center>
+					<h1 style="margin-top: 64px">Создание ДеРуК Аккаунта</h1>
+					<p>Приветствую Вас, дорогой участник! Я думаю, Вы уже прочитали <a href="/deruc-rules">Кодекс Чести Участника ДеРуК</a></p>
+					<p>Теперь, осталось лишь создать сам аккаунт! </p>
 
-	let getuserreq = new XMLHttpRequest();
-	getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + document.querySelector('.profile-name').innerText, true);
-	getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-	getuserreq.send();
-	getuserreq.onreadystatechange = function() {
-		if (getuserreq.status === 200 && !getuserreq.responseText.trim()) {
-			document.querySelector('#view').innerHTML = `
-			<center>
-				<h1 style="margin-top: 64px">Создание ДеРуК Аккаунта</h1>
-				<p>Приветствую Вас, дорогой участник! Я думаю, Вы уже прочитали <a href="/deruc-rules">Кодекс Чести Участника ДеРуК</a></p>
-				<p>Теперь, осталось лишь создать сам аккаунт! </p>
+					<button class="button" id="createDerucAccount">Я готов!</button>
+				</center>
+				`;
 
-				<button class="button" id="createDerucAccount">Я готов!</button>
-			</center>
-			`;
+				document.querySelector('#createDerucAccount').onclick = () => {
+					document.querySelector('#createDerucAccount').disabled = true;
+					document.querySelector('#createDerucAccount').style.opacity = 0.5;
+					document.querySelector('#createDerucAccount').innerText = 'Создаём Аккаунт...';
 
-			document.querySelector('#createDerucAccount').onclick = () => {
-				document.querySelector('#createDerucAccount').disabled = true;
-				document.querySelector('#createDerucAccount').style.opacity = 0.5;
-				document.querySelector('#createDerucAccount').innerText = 'Создаём Аккаунт...';
-
-				getSession((session) => {
 					let postreq = new XMLHttpRequest();
 					postreq.open("POST", "https://deruc.glitch.me/api/createAccount", true);
 					postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
@@ -124,10 +142,10 @@ function createAccount () {
 							alert('Ошибка, отказано в доступе!');
 						}
 					}
-				});
+				}
 			}
 		}
-	}
+	});
 }
 
 function compareTime(date) {
