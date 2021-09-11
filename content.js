@@ -44,7 +44,7 @@ function updateProfile () {
 	getreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 	getreq.send();
 	getreq.onreadystatechange = function() {
-		if (getreq.status === 200) {
+		if (getreq.readyState == 4 && getreq.status === 200) {
 			// if deruc account doesnt exist, return
 			if(!getreq.responseText) return;
 
@@ -58,6 +58,14 @@ function updateProfile () {
 				document.querySelector('.avatar>a>img').style.border = '3px solid';
 				document.querySelector('.avatar>a>img').style.borderRadius = '8px';
 				document.querySelector('.avatar>a>img').style.borderColor = '#fcba03';
+			}
+
+			// for moderators
+			else if(response.role == 'moderator') {
+				document.querySelector('.group').innerText = 'DeRuC Модератор';
+				document.querySelector('.avatar>a>img').style.border = '3px solid';
+				document.querySelector('.avatar>a>img').style.borderRadius = '4px';
+				document.querySelector('.avatar>a>img').style.borderColor = '#37b330';
 			}
 
 			// last active/banned text
@@ -91,18 +99,104 @@ function updateProfile () {
 					]
 					onlinetext.innerText += ` • Был в сети `;
 					if(onlinedifference < 60) onlinetext.innerText += `${onlinedifference} минут назад`;
-					else if(onlinedifference < 60*24) onlinetext.innerText += `${onlinedifference} часов назад`;
+					else if(onlinedifference < 60*24) onlinetext.innerText += `${Math.floor(onlinedifference/60)} часов назад`;
 					else onlinetext.innerText += `${response.lastActive.day} ${months[response.lastActive.month]} ${months[response.lastActive.year]} года`;
 				}
 			}
 			document.querySelector('.group').appendChild(onlinetext);
+
+			getSession((session) => {
+				if(!session.user) return;
+
+				let getselfreq = new XMLHttpRequest();
+				getselfreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
+				getselfreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+				getselfreq.send();
+				getselfreq.onreadystatechange = () => {
+					if (getselfreq.readyState == 4 && getselfreq.status === 200) {
+						if(!getselfreq.responseText.trim()) return;
+
+						getselfreq.onreadystatechange = null;
+
+						let self = JSON.parse(getselfreq.responseText);
+						if(
+							((self.role == 'moderator' && response.role == 'member') || 
+							(self.role == 'admin' && response.role != 'admin')) &&
+							!document.querySelector('#deruc-ban')
+						) {
+							//add a ban/unban button
+							document.querySelector('#follow-button').innerHTML = `
+							<div class="follow-button button following grey" id="deruc-ban">
+								<span class="unfollow text">${response.bannedDeruc ? 'Разбанить в DeRuC' : 'Забанить в DeRuC'}</span>
+							</div>` + document.querySelector('#follow-button').innerHTML;
+
+							// on ban button click
+							document.querySelector('#deruc-ban').onclick = () => {
+								// confirm on ban, but not on unban
+								if(response.bannedDeruc || confirm(`Вы действительно хотите забанить ${username}?` + 
+								'У них пропадёт доступ к большинству функциям ДеРуК, но они всё ещё смогут ' +
+								'взаимодействовать с другими в Скретче.')) {
+									let postreq = new XMLHttpRequest();
+									postreq.open("POST", "https://deruc.glitch.me/api/ban", true);
+									postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+									postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+									// send with our session and target username in the request body
+									postreq.send(JSON.stringify({ session: session, target: username, unban: response.bannedDeruc }));
+									postreq.onreadystatechange = () => {
+										if(postreq.status == 200) {
+											postreq.onreadystatechange = null;
+											alert(`Пользователь ${response.bannedDeruc ? 'раз' : 'за'}банен`);
+											window.location.reload(true);
+										} else if(postreq.status == 403) {
+											alert('Вам нехватает прав, чтобы забанить данного участника');
+										} else if(postreq.status == 401) {
+											alert('Ошибка, отказано в доступе!');
+										}
+									}
+								}
+							}
+						}
+						if(self.role == 'admin' && response.role != 'admin' && !document.querySelector('#deruc-promote')) {
+							// add promote button
+							document.querySelector('#follow-button').innerHTML = `
+							<div class="follow-button button following grey" id="deruc-promote">
+								<span class="unfollow text">${response.role == 'moderator' ? 'Убрать Модератора' : 'Сделать Модератором'}</span>
+							</div>` + document.querySelector('#follow-button').innerHTML;
+
+							// on ban button click
+							document.querySelector('#deruc-promote').onclick = () => {
+								// confirm on ban, but not on unban
+								if(confirm('Вы уверены?')) {
+									let postreq = new XMLHttpRequest();
+									postreq.open("POST", "https://deruc.glitch.me/api/promote", true);
+									postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+									postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+									// send with our session and target username in the request body
+									postreq.send(JSON.stringify({ session: session, target: username, unpromote: response.role == 'moderator' }));
+									postreq.onreadystatechange = () => {
+										if(postreq.status == 200) {
+											postreq.onreadystatechange = null;
+											alert(`Пользователь ${response.role == 'moderator' ? 'снят с должности модератора' : 'стал модератором'}`);
+											window.location.reload(true);
+										} else if(postreq.status == 403) {
+											alert('Вам нехватает прав, чтобы повысить данного участника');
+										} else if(postreq.status == 401) {
+											alert('Ошибка, отказано в доступе!');
+										}
+									}
+								}
+							}
+						}
+					}
+				};
+			});
 		}
 	}
 }
 
 function createAccount () {
 	// if not on this specific project, return
-	if(!window.location.pathname.includes('568927438')) return;
+	if(!window.location.pathname.includes('569163646')) return;
 	
 	getSession((session) => {
 		// if not logged in, return
@@ -112,13 +206,15 @@ function createAccount () {
 		getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 		getuserreq.send();
 		getuserreq.onreadystatechange = function() {
+			if (getuserreq.readyState != 4) return;
+
 			let json;
 			try {
 				json = JSON.parse(getuserreq.responseText);
 			} catch {
 				json = {}
 			}
-
+			console.log(json);
 			if(getuserreq.status == 200) getuserreq.onreadystatechange = null;
 			// if deruc account doesnt exist, replace html of the page with the login screen
 			if (getuserreq.status === 200 && !json.role) {
@@ -159,6 +255,61 @@ function createAccount () {
 			}
 		}
 	});
+}
+
+function derucRules () {
+	if(document.querySelector('.lists')) {
+		document.querySelector('.lists').children[1].innerHTML += `
+		<dd><a href="/deruc-rules"><span>Кодекс Чести ДеРуК</span></a></dd>`;
+	}
+
+	if(document.querySelector('.footer-col')) {
+		document.querySelector('.footer-col').children[1].children[1].innerHTML += `
+		<li><a href="/deruc-rules">Кодекс Чести ДеРуК</a></li>`;
+	}
+
+
+	if(window.location.pathname == '/deruc-rules') {
+		document.querySelector('.box').style.marginLeft = "auto";
+		document.querySelector('.box').style.marginRight = "auto";
+		document.querySelector('.box').style.width = "480px";
+
+		document.querySelector('.box-content').style.padding = '32px';
+		document.querySelector('.box-content').innerHTML = `
+		<h1>Кодекс Чести Участника ДеРуК</h1>
+		<p style="text-align: left">Я, как участник ДеРуК, обещаю 
+		следовать этим правилам:</p>
+		
+		<p style="text-align: left">
+		1. Я обещаю никого не оскорблять и не
+		унижать. Я также обещаю не быть
+		токсичным по отношению к кому-либо.
+		Я обещаю стараться решать все
+		конфликты мирным путём, с как можно
+		меньшим количеством ссор и обид.</p>
+		 
+		<p style="text-align: left">
+		2. Я обещаю уважительно относиться
+		к лидерам и модераторам ДеРуК. Я 
+		также обещаю стараться слушаться их
+		и не конфликтовать с ними.</p>
+		 
+		<p style="text-align: left">
+		3. Я обещаю следовать правилам сайта
+		Скретч и не искать лазейки в них. Я
+		также обещаю, что буду говорить
+		модераторам или лидерам ДеРуК о
+		замеченных мною нарушениях правил
+		Скретча или этого кодекса других
+		участников этого сообщества.</p>
+
+		<p style="text-align: left">
+		Если я не соглашаюсь с данным кодексом,
+		я не собираюсь быть частью сообщества
+		ДеРуК
+		</p>
+		`;
+	}
 }
 
 function compareTime(date) {
@@ -213,5 +364,6 @@ setInterval(() => {updateLastActive()}, 60000);
 setTimeout(() => {updateProfile()}, 500);
 window.onload = () => {
 	updateProfile();
-	setTimeout(() => {createAccount()}, 100);
+	derucRules();
+	createAccount();
 };
