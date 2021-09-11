@@ -33,21 +33,26 @@ function run() {
 }
 
 function updateProfile () {
+	// if not on a user page, return
 	if(!window.location.href.includes('/users/')) return;
 
 	let username = document.querySelector('.header-text>h2').innerText;
 
+	// request deruc api for the user to whom this page belongs
 	let getreq = new XMLHttpRequest();
 	getreq.open("GET", "https://deruc.glitch.me/api/users/" + username, true);
 	getreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 	getreq.send();
 	getreq.onreadystatechange = function() {
 		if (getreq.status === 200) {
+			// if deruc account doesnt exist, return
 			if(!getreq.responseText) return;
 
+			// else, add a "deruc member"
 			document.querySelector('.group').innerText = 'Участник DeRuC';
 			
 			let response = JSON.parse(getreq.responseText);
+			// for admins
 			if(response.role == 'admin') {
 				document.querySelector('.group').innerText = 'DeRuC Лидер';
 				document.querySelector('.avatar>a>img').style.border = '3px solid';
@@ -55,20 +60,24 @@ function updateProfile () {
 				document.querySelector('.avatar>a>img').style.borderColor = '#fcba03';
 			}
 
+			// last active/banned text
 			let onlinetext = document.querySelector('#derucStatus');
 			if(!onlinetext) onlinetext = document.createElement('span');
 			onlinetext.id = 'derucStatus';
 
 			if(response.bannedDeruc) {
+				// banned from deruc
 				onlinetext.innerText = ` • Забанен в ДеРуК`;
 				onlinetext.style.color = '#aa0033';
 			}else {
 				onlinetext.innerText = '';
 			}
 			if(response.bannedScratch) {
+				// banned in scratch
 				onlinetext.innerText += ` • Забанен в Скретче`;
 				onlinetext.style.color = '#aa0033';
 			} else {
+				// calculate time difference
 				let onlinedifference = compareTime(response.lastActive);
 				if(onlinedifference <= 1) {
 					onlinetext.innerText += ` • В Сети`;
@@ -92,9 +101,11 @@ function updateProfile () {
 }
 
 function createAccount () {
+	// if not on this specific project, return
 	if(!window.location.pathname.includes('568927438')) return;
 	
 	getSession((session) => {
+		// if not logged in, return
 		if(!session.user) return;
 		let getuserreq = new XMLHttpRequest();
 		getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
@@ -107,8 +118,9 @@ function createAccount () {
 			} catch {
 				json = {}
 			}
-			console.log('AAAAAAAA', !json.role);
+
 			if(getuserreq.status == 200) getuserreq.onreadystatechange = null;
+			// if deruc account doesnt exist, replace html of the page with the login screen
 			if (getuserreq.status === 200 && !json.role) {
 				document.querySelector('#view').innerHTML = `
 				<center>
@@ -125,6 +137,7 @@ function createAccount () {
 					document.querySelector('#createDerucAccount').style.opacity = 0.5;
 					document.querySelector('#createDerucAccount').innerText = 'Создаём Аккаунт...';
 
+					// post a request to create account
 					let postreq = new XMLHttpRequest();
 					postreq.open("POST", "https://deruc.glitch.me/api/createAccount", true);
 					postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
@@ -193,9 +206,9 @@ function updateLastActive() {
 	});
 }
 
+// initial stuff
 updateLastActive();
 setInterval(() => {updateLastActive()}, 60000);
-
 
 setTimeout(() => {updateProfile()}, 500);
 window.onload = () => {
