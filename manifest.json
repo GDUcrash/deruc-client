@@ -7,5 +7,23 @@
 			"matches": ["*://scratch.mit.edu/*"],
 			"js": ["content.js"]
 		}
-	]
+	],
+	"author": "Ucrash",
+
+	"action": {
+		"default_icon": {             
+			"16": "images/icon16.png",
+			"24": "images/icon24.png",
+			"32": "images/icon32.png"
+		},
+		"default_title": "Добро Пожаловать в DeRuC!"
+	},
+	"default_locale": "ru",
+	"description": "Client for DeRuC Scratch Community",
+	"icons": { 
+		"16": "images/icon16.png",
+		"48": "images/icon48.png",
+	   	"128": "images/icon128.png" 
+	},
+	"incognito": "split"
 }
