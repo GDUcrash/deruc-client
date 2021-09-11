@@ -100,7 +100,7 @@ function updateProfile () {
 					onlinetext.innerText += ` • Был в сети `;
 					if(onlinedifference < 60) onlinetext.innerText += `${onlinedifference} минут назад`;
 					else if(onlinedifference < 60*24) onlinetext.innerText += `${Math.floor(onlinedifference/60)} часов назад`;
-					else onlinetext.innerText += `${response.lastActive.day} ${months[response.lastActive.month]} ${months[response.lastActive.year]} года`;
+					else onlinetext.innerText += `${response.lastActive.day} ${months[response.lastActive.month]} ${response.lastActive.year} года`;
 				}
 			}
 			document.querySelector('.group').appendChild(onlinetext);
@@ -119,6 +119,7 @@ function updateProfile () {
 						getselfreq.onreadystatechange = null;
 
 						let self = JSON.parse(getselfreq.responseText);
+						if(self.bannedDeruc) return;
 						if(
 							((self.role == 'moderator' && response.role == 'member') || 
 							(self.role == 'admin' && response.role != 'admin')) &&
@@ -129,32 +130,6 @@ function updateProfile () {
 							<div class="follow-button button following grey" id="deruc-ban">
 								<span class="unfollow text">${response.bannedDeruc ? 'Разбанить в DeRuC' : 'Забанить в DeRuC'}</span>
 							</div>` + document.querySelector('#follow-button').innerHTML;
-
-							// on ban button click
-							document.querySelector('#deruc-ban').onclick = () => {
-								// confirm on ban, but not on unban
-								if(response.bannedDeruc || confirm(`Вы действительно хотите забанить ${username}?` + 
-								'У них пропадёт доступ к большинству функциям ДеРуК, но они всё ещё смогут ' +
-								'взаимодействовать с другими в Скретче.')) {
-									let postreq = new XMLHttpRequest();
-									postreq.open("POST", "https://deruc.glitch.me/api/ban", true);
-									postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-									postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-									// send with our session and target username in the request body
-									postreq.send(JSON.stringify({ session: session, target: username, unban: response.bannedDeruc }));
-									postreq.onreadystatechange = () => {
-										if(postreq.status == 200) {
-											postreq.onreadystatechange = null;
-											alert(`Пользователь ${response.bannedDeruc ? 'раз' : 'за'}банен`);
-											window.location.reload(true);
-										} else if(postreq.status == 403) {
-											alert('Вам нехватает прав, чтобы забанить данного участника');
-										} else if(postreq.status == 401) {
-											alert('Ошибка, отказано в доступе!');
-										}
-									}
-								}
-							}
 						}
 						if(self.role == 'admin' && response.role != 'admin' && !document.querySelector('#deruc-promote')) {
 							// add promote button
@@ -180,6 +155,34 @@ function updateProfile () {
 											window.location.reload(true);
 										} else if(postreq.status == 403) {
 											alert('Вам нехватает прав, чтобы повысить данного участника');
+										} else if(postreq.status == 401) {
+											alert('Ошибка, отказано в доступе!');
+										}
+									}
+								}
+							}
+						}
+
+						// on ban button click
+						if(document.querySelector('#deruc-ban')) {
+							document.querySelector('#deruc-ban').onclick = () => {
+								// confirm on ban, but not on unban
+								if(response.bannedDeruc || confirm(`Вы действительно хотите забанить ${username}?` + 
+								' У них пропадёт доступ к большинству функциям ДеРуК, но они всё ещё смогут ' +
+								'взаимодействовать с другими в Скретче.')) {
+									let postreq = new XMLHttpRequest();
+									postreq.open("POST", "https://deruc.glitch.me/api/ban", true);
+									postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+									postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+									// send with our session and target username in the request body
+									postreq.send(JSON.stringify({ session: session, target: username, unban: response.bannedDeruc }));
+									postreq.onreadystatechange = () => {
+										if(postreq.status == 200) {
+											postreq.onreadystatechange = null;
+											alert(`Пользователь ${response.bannedDeruc ? 'раз' : 'за'}банен`);
+											window.location.reload(true);
+										} else if(postreq.status == 403) {
+											alert('Вам нехватает прав, чтобы забанить данного участника');
 										} else if(postreq.status == 401) {
 											alert('Ошибка, отказано в доступе!');
 										}
@@ -348,12 +351,33 @@ function getSession(callback) {
 // post status update to deruc api
 function updateLastActive() {
 	getSession((session) => {
-		let postreq = new XMLHttpRequest();
-		postreq.open("POST", "https://deruc.glitch.me/api/status/ping", true);
-		postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-		postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-		// send with our session in the request body
-		postreq.send(JSON.stringify({ session: session }));
+		let getuserreq = new XMLHttpRequest();
+		getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
+		getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		getuserreq.send();
+		getuserreq.onreadystatechange = function() {
+			if (getuserreq.readyState != 4) return;
+
+			let json;
+			try {
+				json = JSON.parse(getuserreq.responseText);
+			} catch {
+				json = {};
+			}
+
+			if(json.bannedDeruc) {
+				alert('Вы забанены на ДеРуК. Большинство функций расширения будут недоступны');
+
+				return;
+			}
+
+			let postreq = new XMLHttpRequest();
+			postreq.open("POST", "https://deruc.glitch.me/api/status/ping", true);
+			postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+			postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+			// send with our session in the request body
+			postreq.send(JSON.stringify({ session: session }));
+		}
 	});
 }
 
