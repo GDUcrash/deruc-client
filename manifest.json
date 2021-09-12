@@ -1,6 +1,6 @@
 {
 	"name":"DeRuC Scratch Client",
-	"version":"0.1.0",
+	"version":"0.2.0",
 	"manifest_version": 2,
 	"content_scripts": [
 		{
@@ -24,5 +24,8 @@
 		"48": "images/icon48.png",
 	   	"128": "images/icon128.png" 
 	},
-	"incognito": "split"
+
+	"permissions": [
+		"<all_urls>"
+	]
 }

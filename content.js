@@ -768,8 +768,15 @@ let usernavInterval = setInterval(() => {
 }, 500);
 
 setTimeout(() => {updateProfile()}, 500);
-window.onload = () => {
+
+if(navigator.userAgent.includes('Firefox')) {
 	updateProfile();
 	staticPages();
 	createAccount();
-};
+} else {
+	window.onload = () => {
+		updateProfile();
+		staticPages();
+		createAccount();
+	}
+}
