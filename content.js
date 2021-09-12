@@ -1,3 +1,9 @@
+const months = [
+	'января', 'февраля', 'марта', 'апреля',
+	'мая', 'июня', 'июля', 'августа',
+	'сентября', 'октября', 'ноября', 'декабря'
+];
+
 function updateProfile () {
 	// if not on a user page, return
 	if(!window.location.href.includes('/users/')) return;
@@ -58,11 +64,6 @@ function updateProfile () {
 					onlinetext.style.color = '#00aa44';
 				}
 				else {
-					let months = [
-						'января', 'февраля', 'марта', 'апреля',
-						'мая', 'июня', 'июля', 'августа',
-						'сентября', 'октября', 'ноября', 'декабря'
-					]
 					onlinetext.innerText += ` • Был в сети `;
 					if(onlinedifference < 60) onlinetext.innerText += `${onlinedifference} минут назад`;
 					else if(onlinedifference < 60*24) onlinetext.innerText += `${Math.floor(onlinedifference/60)} часов назад`;
@@ -86,16 +87,27 @@ function updateProfile () {
 
 						let self = JSON.parse(getselfreq.responseText);
 						if(self.bannedDeruc) return;
+
+						// add dm button
+						if(!document.querySelector('#deruc-dm'))
+							document.querySelector('#follow-button').innerHTML = `
+							<div class="follow-button button following" id="deruc-dm">
+								<span class="unfollow text">Написать в ЛС</span>
+							</div>` + document.querySelector('#follow-button').innerHTML;
+
+
 						if(
 							((self.role == 'moderator' && response.role == 'member') || 
 							(self.role == 'admin' && response.role != 'admin')) &&
 							!document.querySelector('#deruc-ban')
 						) {
 							//add a ban/unban button
-							document.querySelector('#follow-button').innerHTML = `
-							<div class="follow-button button following grey" id="deruc-ban">
-								<span class="unfollow text">${response.bannedDeruc ? 'Разбанить в DeRuC' : 'Забанить в DeRuC'}</span>
-							</div>` + document.querySelector('#follow-button').innerHTML;
+							document.querySelector('.footer').innerHTML = `
+							<div class="action" style="color: #777; font-size: 12px;
+							position: absolute; right: 128px; top: 0px; cursor: pointer;">
+								<span class="text black" id="deruc-ban">${response.bannedDeruc ? 'Разбанить в DeRuC' : 'Забанить в DeRuC'}</span>
+							</div>
+							` + document.querySelector('.footer').innerHTML;
 						}
 						if(self.role == 'admin' && response.role != 'admin' && !document.querySelector('#deruc-promote')) {
 							// add promote button
@@ -154,6 +166,13 @@ function updateProfile () {
 										}
 									}
 								}
+							}
+						}
+
+						// on dm button click
+						if(document.querySelector('#deruc-dm')) {
+							document.querySelector('#deruc-dm').onclick = (e) => {
+								openDmWith(session, username, e);
 							}
 						}
 					}
@@ -228,43 +247,63 @@ function createAccount () {
 
 let navLoaded = false;
 function userNav () {
-	if(document.querySelector('.user-nav') || document.querySelector('.dropdown')) {
-		navLoaded = true;
-		let el = document.querySelector('.user-nav') || document.querySelector('.dropdown');
-		let li = document.createElement('li');
-		li.innerHTML = `<a id="derucUnreadDms" style="color: white">Личные Сообщения <span id="derucUnreadDmsBadge">0</span></a>`;
-		el.insertBefore(li, el.children[2]);
+	getSession((session) => {
+		if(!session.user) return;
 
-		let derucUnreadDmsBadge = document.querySelector('#derucUnreadDmsBadge');
-		derucUnreadDmsBadge.style.padding = '2px 5px';
-		derucUnreadDmsBadge.style.background = '#fcba03';
-		derucUnreadDmsBadge.style.borderRadius = '50px';
-		derucUnreadDmsBadge.style.display = 'none';
+		let getuserreq = new XMLHttpRequest();
+		getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
+		getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		getuserreq.send();
+		getuserreq.onreadystatechange = function() {
+			if (getuserreq.readyState != 4) return;
 
-		getSession((session) => {
-			let getreq = new XMLHttpRequest();
-			getreq.open("GET", "https://deruc.glitch.me/api/dm/unread?username=" + session.user.username, true);
-			getreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-			getreq.send();
-			getreq.onreadystatechange = function() {
-				if (getreq.readyState == 4 && getreq.status === 200) {
-					let jsonSelf;
-					try {
-						jsonSelf = JSON.parse(getreq.responseText);
-					} catch {
-						jsonSelf = {}
+			let json;
+			try {
+				json = JSON.parse(getuserreq.responseText);
+			} catch {
+				json = null;
+			}
+
+			if(!json || json.bannedDeruc) return;
+
+			if(document.querySelector('.user-nav') || document.querySelector('.dropdown')) {
+				navLoaded = true;
+				let el = document.querySelector('.user-nav') || document.querySelector('.dropdown');
+				let li = document.createElement('li');
+				li.innerHTML = `<a id="derucUnreadDms" style="color: white">Личные Сообщения <span id="derucUnreadDmsBadge">0</span></a>`;
+				el.insertBefore(li, el.children[2]);
+	
+				let derucUnreadDmsBadge = document.querySelector('#derucUnreadDmsBadge');
+				derucUnreadDmsBadge.style.padding = '2px 5px';
+				derucUnreadDmsBadge.style.background = '#fcba03';
+				derucUnreadDmsBadge.style.borderRadius = '50px';
+				derucUnreadDmsBadge.style.display = 'none';
+	
+				
+				let getreq = new XMLHttpRequest();
+				getreq.open("GET", "https://deruc.glitch.me/api/dm/unread?username=" + session.user.username, true);
+				getreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+				getreq.send();
+				getreq.onreadystatechange = function() {
+					if (getreq.readyState == 4 && getreq.status === 200) {
+						let jsonSelf;
+						try {
+							jsonSelf = JSON.parse(getreq.responseText);
+						} catch {
+							jsonSelf = {}
+						}
+	
+						derucUnreadDmsBadge.innerText = jsonSelf.count || 0;
+						if(jsonSelf.count && jsonSelf.count > 0) derucUnreadDmsBadge.style.display = 'inline';
 					}
-
-					derucUnreadDmsBadge.innerText = jsonSelf.count || 0;
-					if(jsonSelf.count && jsonSelf.count > 0) derucUnreadDmsBadge.style.display = 'inline';
+				}
+	
+				document.querySelector('#derucUnreadDms').onclick = () => {
+					window.location.pathname = '/dms';
 				}
 			}
-		});
-
-		document.querySelector('#derucUnreadDms').onclick = () => {
-			window.location.pathname = '/dms';
 		}
-	}
+	});
 }
 
 function staticPages () {
@@ -327,26 +366,7 @@ function staticPages () {
 
 								document.querySelector('.box-content').appendChild(div);
 								document.querySelector(`#dmBox${li}`).onclick = (e) => {
-									let dmBox = openDmWith(session, uk);
-									dmBox.style.left = Math.max(e.pageX - 256, 32) + 'px';
-									dmBox.style.top = (e.pageY + 16) + 'px';
-									document.body.appendChild(dmBox);
-
-									let isInside = false;
-
-									dmBox.onmouseenter = () => { isInside = true }
-									dmBox.onmouseleave = () => { isInside = false }
-
-									function destroyDmBox () {
-										if(!isInside) {
-											document.body.removeChild(dmBox);
-											document.body.removeEventListener('click', destroyDmBox);
-										}
-									}
-
-									setTimeout(() => {
-										document.body.addEventListener('click', destroyDmBox);
-									}, 800);
+									openDmWith(session, uk, e);
 								}
 
 								i++;
@@ -412,63 +432,42 @@ function staticPages () {
 	}
 }
 
-function commentDms () {
+function commentDms (session) {
 	let h = false;
 	if(window.location.href.includes('/users/') || window.location.href.includes('/projects/')) {
 		h = true;
-		getSession((session) => {
-			if(!session.user) return;
-			let i = 0;
-			Object.values(document.getElementsByClassName('comment')).forEach(comment => {
-				let username = comment.querySelector('.name') || comment.querySelector('.username')
-				if(!username) return;
-				if(session.user.username == username.innerText) return;
+		
+		let i = 0;
+		Object.values(document.getElementsByClassName('comment')).forEach(comment => {
+			let username = comment.querySelector('.name') || comment.querySelector('.username')
+			if(!username) return;
+			if(session.user.username == username.innerText) return;
 
-				let li = parseInt(i);
-				if(comment.querySelector('.actions-wrap')) {
-					if(comment.querySelector('.derucActionButton')) return;
-					comment.querySelector('.actions-wrap').innerHTML += `
-					<span class="actions report derucActionButton" id="derucCommentDm${li}">Написать в ЛС</span>
-					`;
+			let li = parseInt(i);
+			if(comment.querySelector('.actions-wrap')) {
+				if(comment.querySelector('.derucActionButton')) return;
+				comment.querySelector('.actions-wrap').innerHTML += `
+				<span class="actions report derucActionButton" id="derucCommentDm${li}">Написать в ЛС</span>
+				`;
+			}
+
+			if(comment.querySelector('.action-list')) {
+				if(comment.querySelector('.derucActionButton')) return;
+				let sp = document.createElement('span');
+				sp.style = "margin-right: 1rem; opacity: .5; cursor: pointer; font-size: .75rem; font-weight: 500;"
+				sp.className = "derucActionButton";
+				sp.id = `derucCommentDm${li}`;
+				sp.innerHTML = '<span>Написать в ЛС</span>';
+				comment.querySelector('.action-list').insertBefore(sp, comment.querySelector('.action-list').children[0]);
+			}
+
+			if(document.querySelector(`#derucCommentDm${li}`)) {
+				document.querySelector(`#derucCommentDm${li}`).onclick = (e) => {
+					openDmWith(session, username.innerText, e);
 				}
+			}
 
-				if(comment.querySelector('.action-list')) {
-					if(comment.querySelector('.derucActionButton')) return;
-					let sp = document.createElement('span');
-					sp.style = "margin-right: 1rem; opacity: .5; cursor: pointer; font-size: .75rem; font-weight: 500;"
-					sp.className = "derucActionButton";
-					sp.id = `derucCommentDm${li}`;
-					sp.innerHTML = '<span>Написать в ЛС</span>';
-					comment.querySelector('.action-list').insertBefore(sp, comment.querySelector('.action-list').children[0]);
-				}
-
-				if(document.querySelector(`#derucCommentDm${li}`)) {
-					document.querySelector(`#derucCommentDm${li}`).onclick = (e) => {
-						let dmBox = openDmWith(session, username.innerText);
-						dmBox.style.left = (e.pageX - 256) + 'px';
-						dmBox.style.top = (e.pageY + 16) + 'px';
-						document.body.appendChild(dmBox);
-
-						let isInside = false;
-
-						dmBox.onmouseenter = () => { isInside = true }
-						dmBox.onmouseleave = () => { isInside = false }
-
-						function destroyDmBox () {
-							if(!isInside) {
-								document.body.removeChild(dmBox);
-								document.body.removeEventListener('click', destroyDmBox);
-							}
-						}
-
-						setTimeout(() => {
-							document.body.addEventListener('click', destroyDmBox);
-						}, 100);
-					}
-				}
-
-				i++;
-			});
+			i++;
 		});
 	}
 
@@ -587,13 +586,24 @@ function createDm (dm, json) {
 	dmText.style.margin = '0 0 5px 0';
 	dmDate.style.color = '#b3b3b3';
 	dmDate.style.fontSize = '10px';
+	dmText.style.color = '#575e75';
 	dmDate.style.margin = '0';
-	dmDate.innerText = `${compareTime(dm.date)} minutes ago`;
+
+	// calculate time difference
+	let onlinedifference = compareTime(dm.date);
+	if(onlinedifference <= 1) {
+		dmDate.innerText = `Прямо Сейчас`;
+	}
+	else {
+		if(onlinedifference < 60) dmDate.innerText = `${onlinedifference} минут назад`;
+		else if(onlinedifference < 60*24) dmDate.innerText = `${Math.floor(onlinedifference/60)} часов назад`;
+		else dmDate.innerText = `${response.lastActive.day} ${months[response.lastActive.month]} ${response.lastActive.year} года`;
+	}
 
 	return dmHolder;
 }
 
-function openDmWith (session, target) {
+function openDmWith (session, target, e) {
 	let dmBox = document.createElement('div');
 	dmBox.style.position = 'absolute';
 	dmBox.style.zIndex = 999;
@@ -629,6 +639,8 @@ function openDmWith (session, target) {
 	dmInput.placeholder = `Написать ${target}`;
 	dmInput.style.marginBottom = '10px';
 	dmInput.marginRight = '5px';
+	dmInput.style.background = 'white';
+	dmInput.style.color = '#575e75';
 	let dmButton = document.createElement('button');
 	dmButton.classList.add('button');
 	dmButton.innerText = 'Отправить';
@@ -708,18 +720,45 @@ function openDmWith (session, target) {
 							scrolled = true;
 						}
 
-						if(json.length == 0) dmContent.innerHTML = `<p>В этом лс пока ничего нет. Напишите первое сообщение!</p>`;
+						if(json.length == 0) dmContent.innerHTML = `<p style="color: #575e75;">В этом лс пока ничего нет. Напишите первое сообщение!</p>`;
 					} else if(postreq.status == 403) {
-						dmContent.innerHTML = `<p>Этого пользователя нет в ДеРуК. Хотите общаться с ним лично? Пригласите его в сообщество!</p>`;
+						dmContent.innerHTML = `<p style="color: #575e75;">Этого пользователя нет в ДеРуК. Хотите общаться с ним лично? Пригласите его в сообщество!</p>`;
 					} else if(postreq.status == 401) {
-						dmContent.innerHTML = `<p>У вас недостаточно прав на просмотр этого ЛС!</p>`;
+						dmContent.innerHTML = `<p style="color: #575e75;">У вас недостаточно прав на просмотр этого ЛС!</p>`;
 					}
 				}
 			}
 		});		
 	});
 
-	return dmBox;
+	dmBox.onkeypress = (e) => {
+		if(e.keyCode == 13) {
+			dmButton.click();
+		}
+	}
+
+	setTimeout(() => {dmInput.focus()}, 100);
+
+
+	dmBox.style.left = Math.max(e.pageX - 256, 32) + 'px';
+	dmBox.style.top = (e.pageY + 16) + 'px';
+	document.body.appendChild(dmBox);
+
+	let isInside = false;
+
+	dmBox.onmouseenter = () => { isInside = true }
+	dmBox.onmouseleave = () => { isInside = false }
+
+	function destroyDmBox () {
+		if(!isInside) {
+			document.body.removeChild(dmBox);
+			document.body.removeEventListener('click', destroyDmBox);
+		}
+	}
+
+	setTimeout(() => {
+		document.body.addEventListener('click', destroyDmBox);
+	}, 800);
 }
 
 function getCachedProfileData(username, callback) {
@@ -751,21 +790,35 @@ function getCachedProfileData(username, callback) {
 updateLastActive();
 setInterval(() => {updateLastActive()}, 60000);
 
-let commentDmInterval = setInterval(() => {
-	let h = commentDms();
-	if(!h) {
-		clearInterval(commentDmInterval);
-		commentDmInterval = null;
-	}
-}, 2000);
+// check for user and if yes, update dm buttons
+getSession((session) => {
+	if(!session.user) return;
 
-let usernavInterval = setInterval(() => {
-	userNav();
-	if(navLoaded) {
-		clearInterval(usernavInterval);
-		usernavInterval = null;
+	let getuserreq = new XMLHttpRequest();
+	getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
+	getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+	getuserreq.send();
+	getuserreq.onreadystatechange = function() {
+		if (getuserreq.readyState != 4) return;
+
+		let json;
+		try {
+			json = JSON.parse(getuserreq.responseText);
+		} catch {
+			json = null;
+		}
+
+		if(!json || json.bannedDeruc) return;
+
+		let commentDmInterval = setInterval(() => {
+			let h = commentDms(session);
+			if(!h) {
+				clearInterval(commentDmInterval);
+				commentDmInterval = null;
+			}
+		}, 2000);
 	}
-}, 500);
+});
 
 setTimeout(() => {updateProfile()}, 500);
 
@@ -773,10 +826,13 @@ if(navigator.userAgent.includes('Firefox')) {
 	updateProfile();
 	staticPages();
 	createAccount();
+	userNav();
+	userNav();
 } else {
 	window.onload = () => {
 		updateProfile();
 		staticPages();
 		createAccount();
+		userNav();
 	}
 }
