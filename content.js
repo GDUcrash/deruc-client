@@ -88,6 +88,48 @@ function updateProfile () {
 						let self = JSON.parse(getselfreq.responseText);
 						if(self.bannedDeruc) return;
 
+						// add status text
+						if(!document.querySelector('#derucMyStatus')) {
+							let statusText;
+
+							if(session.user.username == username) {
+								statusText = document.createElement('span');
+								statusText.id = 'derucMyStatus';
+								statusText.classList.add('group');
+								statusText.innerText = 'Статус: ';
+
+								let statusInput = document.createElement('input');
+								statusInput.placeholder = 'Сделайте себе крутой статус!';
+								statusInput.style.marginBottom = 0;
+								statusInput.id = "derucStatusInput";
+								
+								statusText.appendChild(statusInput);
+							} else if(response.status) {
+								statusText = document.createElement('span');
+								statusText.id = 'derucMyStatus';
+								statusText.classList.add('group');
+								statusText.innerText = `Статус: ${response.status}`;
+							}
+
+							if(statusText) {
+								document.querySelector('.location').innerHTML = statusText.outerHTML + document.querySelector('.location').innerHTML;
+							
+								if(document.querySelector('#derucStatusInput')) {
+									let statusInput = document.querySelector('#derucStatusInput');
+									statusInput.value = response.status;
+									statusInput.onchange = () => {
+										let postreq = new XMLHttpRequest();
+										postreq.open("POST", "https://deruc.glitch.me/api/status/set", true);
+										postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+										postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+										// send with our session in the request body
+										postreq.send(JSON.stringify({ session: session, status: statusInput.value }));
+									}
+									statusInput.id = '';
+								}
+							}
+						}
+
 						// add dm button
 						if(!document.querySelector('#deruc-dm'))
 							document.querySelector('#follow-button').innerHTML = `
@@ -202,7 +244,7 @@ function createAccount () {
 			} catch {
 				json = {}
 			}
-			console.log(json);
+
 			if(getuserreq.status == 200) getuserreq.onreadystatechange = null;
 			// if deruc account doesnt exist, replace html of the page with the login screen
 			if (getuserreq.status === 200 && !json.role) {
@@ -278,6 +320,21 @@ function userNav () {
 				derucUnreadDmsBadge.style.background = '#fcba03';
 				derucUnreadDmsBadge.style.borderRadius = '50px';
 				derucUnreadDmsBadge.style.display = 'none';
+
+				let accountDmBadge = document.createElement('div');
+				accountDmBadge.style.position = 'absolute';
+				accountDmBadge.style.top = '10px';
+				accountDmBadge.style.left = '10px';
+				accountDmBadge.style.width = '10px';
+				accountDmBadge.style.height = '10px';
+				accountDmBadge.style.borderRadius = '10px';
+				accountDmBadge.style.background = '#fcba03';
+				accountDmBadge.style.boxShadow = '0 0 0 5px rgb(252 186 3 / 40%)';
+				accountDmBadge.style.display = 'none';
+
+				let accountNav = document.querySelector('.user-name') || document.querySelector('.account-nav');
+				accountNav.style.position = 'relative';
+				accountNav.appendChild(accountDmBadge);
 	
 				
 				let getreq = new XMLHttpRequest();
@@ -294,7 +351,10 @@ function userNav () {
 						}
 	
 						derucUnreadDmsBadge.innerText = jsonSelf.count || 0;
-						if(jsonSelf.count && jsonSelf.count > 0) derucUnreadDmsBadge.style.display = 'inline';
+						if(jsonSelf.count && jsonSelf.count > 0) {
+							derucUnreadDmsBadge.style.display = 'inline';
+							accountDmBadge.style.display = '';
+						}
 					}
 				}
 	
@@ -434,36 +494,104 @@ function staticPages () {
 
 function commentDms (session) {
 	let h = false;
-	if(window.location.href.includes('/users/') || window.location.href.includes('/projects/')) {
+	if(window.location.href.includes('/users/') || window.location.href.includes('/projects/') || 
+	window.location.href.includes('/studios/') || window.location.href.includes('/messages')) {
 		h = true;
-		
+
 		let i = 0;
-		Object.values(document.getElementsByClassName('comment')).forEach(comment => {
-			let username = comment.querySelector('.name') || comment.querySelector('.username')
-			if(!username) return;
-			if(session.user.username == username.innerText) return;
+		let classn = 'comment';
+		if(window.location.href.includes('/messages')) classn = 'mod-comment-message';
 
-			let li = parseInt(i);
-			if(comment.querySelector('.actions-wrap')) {
-				if(comment.querySelector('.derucActionButton')) return;
-				comment.querySelector('.actions-wrap').innerHTML += `
-				<span class="actions report derucActionButton" id="derucCommentDm${li}">Написать в ЛС</span>
-				`;
+		Object.values(document.getElementsByClassName(classn)).forEach(comment => {
+			if(comment.querySelector('textarea')) return;
+
+			let username = comment.querySelector('.name') || comment.querySelector('.username');
+			if(username){
+				if(session.user.username != username.innerText) {
+					let li = parseInt(i);
+					if(comment.querySelector('.actions-wrap')) {
+						if(!comment.querySelector('.derucActionButton'))
+							comment.querySelector('.actions-wrap').innerHTML += `
+							<span class="actions report derucActionButton" id="derucCommentDm${li}">Написать в ЛС</span>
+							`;
+					}
+
+					if(comment.querySelector('.action-list')) {
+						if(!comment.querySelector('.derucActionButton')) {
+							let sp = document.createElement('span');
+							sp.style = "margin-right: 1rem; opacity: .5; cursor: pointer; font-size: .75rem; font-weight: 500;"
+							sp.className = "derucActionButton";
+							sp.id = `derucCommentDm${li}`;
+							sp.innerHTML = '<span>Написать в ЛС</span>';
+							comment.querySelector('.action-list').insertBefore(sp, comment.querySelector('.action-list').children[0]);
+						}
+					}
+
+					if(document.querySelector(`#derucCommentDm${li}`)) {
+						document.querySelector(`#derucCommentDm${li}`).onclick = (e) => {
+							openDmWith(session, username.innerText, e);
+						}
+					}
+				}
 			}
 
-			if(comment.querySelector('.action-list')) {
-				if(comment.querySelector('.derucActionButton')) return;
-				let sp = document.createElement('span');
-				sp.style = "margin-right: 1rem; opacity: .5; cursor: pointer; font-size: .75rem; font-weight: 500;"
-				sp.className = "derucActionButton";
-				sp.id = `derucCommentDm${li}`;
-				sp.innerHTML = '<span>Написать в ЛС</span>';
-				comment.querySelector('.action-list').insertBefore(sp, comment.querySelector('.action-list').children[0]);
+			let commentContent = null;
+			if(comment.querySelector('.content')) {
+				commentContent = comment.querySelector('.content');
+			}
+			else if(comment.querySelector('.emoji-text')) {
+				commentContent = comment.querySelector('.emoji-text');
 			}
 
-			if(document.querySelector(`#derucCommentDm${li}`)) {
-				document.querySelector(`#derucCommentDm${li}`).onclick = (e) => {
-					openDmWith(session, username.innerText, e);
+			if(commentContent.classList.contains('deruc-comment-processed')) return;
+
+			if(commentContent) {
+				commentContent.classList.add('deruc-comment-processed');
+				let imgChecker = commentContent.innerText.split(':img[').join(']:img').split(']:img');
+				let even = 1;
+				let resultString = '';
+
+				let imgUrls = [];
+				imgChecker.forEach(tag => {
+					even *= -1;
+					let isEven = even > 0;
+					if(!isEven && tag.trim()) {
+						if(!resultString.endsWith(' ')) resultString += ' ';
+						resultString += tag;
+					}
+
+					if(isEven) imgUrls.push(tag);
+				});
+
+				if(imgUrls != '') {
+					commentContent.innerText = resultString;
+					
+					let imageHolder = document.createElement('div');
+					imageHolder.style.width = '100%';
+					commentContent.appendChild(imageHolder);
+
+					imgUrls.forEach(img => {
+						let imgDecoded;
+						try { imgDecoded = atob(img) } catch { }
+
+						if(!imgDecoded) return;
+						checkImage(imgDecoded, (isValid) => {
+							if(isValid) {
+								let imgElem = document.createElement('img');
+								imgElem.src = imgDecoded;
+								imgElem.style.maxHeight = '200px';
+								imgElem.style.maxWidth = '100%';
+								imgElem.style.marginRight = '5px';
+								imgElem.style.borderRadius = '8px';
+								imgElem.style.cursor = 'pointer';
+								imgElem.onclick = () => {
+									window.open(imgDecoded, 'blank')
+								}
+
+								imageHolder.appendChild(imgElem);
+							}
+						});
+					});
 				}
 			}
 
@@ -474,6 +602,52 @@ function commentDms (session) {
 	return h;
 }
 
+function writeCommentBox () {
+	let done = false;
+	if(!window.location.href.includes('/users/') && !window.location.href.includes('/projects/') && !window.location.href.includes('/studios/')) return true;
+	
+	if(!document.querySelector('#derucAddImage')) {
+		done = true;
+		if(window.location.href.includes('/users/')) {
+			document.querySelector('#main-post-form').children[1].innerHTML += `
+			<div class="button small grey" id="derucAddImage"> <a> Добавить Изображение </a></div>`;
+		} else {
+			let newButton = document.createElement('button');
+			newButton.className = 'button compose-cancel';
+			newButton.innerHTML = `<span> Добавить Изображение </span>`;
+			newButton.id = 'derucAddImage';
+			newButton.style.marginLeft = '2rem';
+
+			let elBefore = document.querySelector('.compose-bottom-row .compose-limit');
+			document.querySelector('.compose-bottom-row').insertBefore(newButton, elBefore);
+		}
+
+		document.querySelector('#derucAddImage').onclick = () => {
+			let url = prompt(
+				'Введите ссылку на изображение, которое хотите вставить. ' +
+				'Вот отличные места для хоста изображений: cubeupload.com, discord.com, imgbb.com'
+			);
+
+			checkImage(url, (isValid) => {
+				if(!isValid) return alert('Ошибка! Пожалуйста, введите правильный URL изображения!');
+
+				let commentInput = document.querySelector('#main-post-form textarea') || document.querySelector('#frc-compose-comment-3392903');
+				let inpCursor = commentInput.selectionStart;
+				commentInput.value = commentInput.value.slice(0, inpCursor) + 
+									 `:img[${btoa(url)}]:img` + 
+									 commentInput.value.slice(inpCursor, commentInput.value.length);
+
+				// indent
+				if(!window.location.href.includes('/users/'))
+					setTimeout(() => { 
+						alert('ВНИМАНИЕ! Перед тем как отправлять комментарий, измените как-то текст Вашего сообщения. Иначе, изображение, которое вы добавили не загрузится!');
+					}, 100);
+			});
+		}
+	}
+
+	return done;
+}
 
 
 function compareTime(date) {
@@ -597,7 +771,7 @@ function createDm (dm, json) {
 	else {
 		if(onlinedifference < 60) dmDate.innerText = `${onlinedifference} минут назад`;
 		else if(onlinedifference < 60*24) dmDate.innerText = `${Math.floor(onlinedifference/60)} часов назад`;
-		else dmDate.innerText = `${response.lastActive.day} ${months[response.lastActive.month]} ${response.lastActive.year} года`;
+		else dmDate.innerText = `${dm.date.day} ${months[dm.date.month]} ${dm.date.year} года`;
 	}
 
 	return dmHolder;
@@ -786,47 +960,72 @@ function getCachedProfileData(username, callback) {
 	}
 }
 
+function ifDerucUser (callback) {
+	getSession((session) => {
+		if(!session.user) return;
+	
+		let getuserreq = new XMLHttpRequest();
+		getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
+		getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		getuserreq.send();
+		getuserreq.onreadystatechange = function() {
+			if (getuserreq.readyState != 4) return;
+	
+			let json;
+			try {
+				json = JSON.parse(getuserreq.responseText);
+			} catch {
+				json = null;
+			}
+	
+			if(!json || json.bannedDeruc) return;
+
+			callback(session, json);
+		}
+	});
+}
+
+function checkImage(url, callback) {
+	let image = new Image();
+	image.onload = () => {
+		if (image.width > 0) callback(true);
+		else callback(false);
+	}
+	image.onerror = () => {
+		callback(false);
+	}
+	image.src = url;
+}
+
 // initial stuff
 updateLastActive();
 setInterval(() => {updateLastActive()}, 60000);
 
 // check for user and if yes, update dm buttons
-getSession((session) => {
-	if(!session.user) return;
-
-	let getuserreq = new XMLHttpRequest();
-	getuserreq.open("GET", "https://deruc.glitch.me/api/users/" + session.user.username, true);
-	getuserreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-	getuserreq.send();
-	getuserreq.onreadystatechange = function() {
-		if (getuserreq.readyState != 4) return;
-
-		let json;
-		try {
-			json = JSON.parse(getuserreq.responseText);
-		} catch {
-			json = null;
+ifDerucUser((session, user) => {
+	let commentDmInterval = setInterval(() => {
+		let h = commentDms(session);
+		if(!h) {
+			clearInterval(commentDmInterval);
+			commentDmInterval = null;
 		}
+	}, 2000);
 
-		if(!json || json.bannedDeruc) return;
-
-		let commentDmInterval = setInterval(() => {
-			let h = commentDms(session);
-			if(!h) {
-				clearInterval(commentDmInterval);
-				commentDmInterval = null;
-			}
-		}, 2000);
-	}
+	let commentBoxInterval = setInterval(() => {
+		let h = writeCommentBox();
+		if(h) {
+			clearInterval(commentBoxInterval);
+			commentBoxInterval = null;
+		}
+	}, 2000);
 });
 
-setTimeout(() => {updateProfile()}, 500);
+//setTimeout(() => {updateProfile()}, 500);
 
 if(navigator.userAgent.includes('Firefox')) {
 	updateProfile();
 	staticPages();
 	createAccount();
-	userNav();
 	userNav();
 } else {
 	window.onload = () => {
