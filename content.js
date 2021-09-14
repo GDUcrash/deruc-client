@@ -301,30 +301,6 @@ function createAccount () {
 							alert('Ошибка, отказано в доступе!');
 						}
 					}
-
-					let newsreq = new XMLHttpRequest();
-					newsreq.open("GET", "https://deruc.glitch.me/api/news?index=0", true);
-					newsreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-					newsreq.send();
-					newsreq.onreadystatechange = () => {
-						if (newsreq.readyState != 4) return;
-
-						let json;
-						try {
-							json = JSON.parse(newsreq.responseText);
-						} catch {
-							json = null;
-						}
-
-						if(!json) return;
-
-						let maxid = 0;
-						json.forEach(news => {
-							if(news.id > maxid) maxid = news.id;
-						});
-
-						localStorage.setItem('derucNewsLastId', maxid);
-					}
 				}
 			}
 		}
@@ -776,13 +752,12 @@ function writeCommentBox () {
 }
 
 function news () {
-	ifDerucUser(() => {
-		let lastid = parseInt(localStorage.getItem('derucNewsLastId') || 0);
-	
+	ifDerucUser((session, user) => {	
 		let newsreq = new XMLHttpRequest();
-		newsreq.open("GET", "https://deruc.glitch.me/api/news?index=" + lastid, true);
+		newsreq.open("POST", "https://deruc.glitch.me/api/news", true);
 		newsreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-		newsreq.send();
+		newsreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+		newsreq.send(JSON.stringify({ session: session, index: user.lastReadNews }));
 		newsreq.onreadystatechange = () => {
 			if (newsreq.readyState != 4) return;
 	
