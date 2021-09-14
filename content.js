@@ -56,6 +56,10 @@ function updateProfile () {
 				// banned in scratch
 				onlinetext.innerText += ` • Забанен в Скретче`;
 				onlinetext.style.color = '#aa0033';
+			} else if(response.invisible) {
+				// banned in scratch
+				onlinetext.innerText += ` • Невидимка`;
+				onlinetext.style.color = '#cfcfcf';
 			} else {
 				// calculate time difference
 				let onlinedifference = compareTime(response.lastActive);
@@ -93,6 +97,22 @@ function updateProfile () {
 							let statusText;
 
 							if(session.user.username == username) {
+								//Invis checkbox
+								document.querySelector('.group').innerHTML += `<input type="checkbox" style="margin-left: 8px" id="derucInvisible"/> Невидимка`;
+								document.querySelector('#derucInvisible').checked = response.invisible;
+								document.querySelector('#derucInvisible').onchange = () => {
+									let postreq = new XMLHttpRequest();
+										postreq.open("POST", "https://deruc.glitch.me/api/status/invisible", true);
+										postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+										postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+										// send with our session in the request body
+										postreq.send(JSON.stringify({ 
+											session: session, 
+											invisible: document.querySelector('#derucInvisible').checked 
+										}));
+								}
+
+								//Status Input
 								statusText = document.createElement('span');
 								statusText.id = 'derucMyStatus';
 								statusText.classList.add('group');
@@ -281,6 +301,30 @@ function createAccount () {
 							alert('Ошибка, отказано в доступе!');
 						}
 					}
+
+					let newsreq = new XMLHttpRequest();
+					newsreq.open("GET", "https://deruc.glitch.me/api/news?index=0", true);
+					newsreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+					newsreq.send();
+					newsreq.onreadystatechange = () => {
+						if (newsreq.readyState != 4) return;
+
+						let json;
+						try {
+							json = JSON.parse(newsreq.responseText);
+						} catch {
+							json = null;
+						}
+
+						if(!json) return;
+
+						let maxid = 0;
+						json.forEach(news => {
+							if(news.id > maxid) maxid = news.id;
+						});
+
+						localStorage.setItem('derucNewsLastId', maxid);
+					}
 				}
 			}
 		}
@@ -369,12 +413,14 @@ function userNav () {
 function staticPages () {
 	if(document.querySelector('.lists')) {
 		document.querySelector('.lists').children[1].innerHTML += `
-		<dd><a href="/deruc-rules"><span>Кодекс Чести ДеРуК</span></a></dd>`;
+		<dd><a href="/deruc-rules"><span>Кодекс Чести ДеРуК</span></a></dd>
+		<dd><a href="/deruc-members"><span>Участники ДеРуК</span></a></dd>`;
 	}
 
 	if(document.querySelector('.footer-col')) {
 		document.querySelector('.footer-col').children[1].children[1].innerHTML += `
-		<li><a href="/deruc-rules">Кодекс Чести ДеРуК</a></li>`;
+		<li><a href="/deruc-rules">Кодекс Чести ДеРуК</a></li>
+		<li><a href="/deruc-members">Участники ДеРуК</a></li>`;
 	}
 
 	if(window.location.pathname == '/dms') {
@@ -483,12 +529,92 @@ function staticPages () {
 		ДеРуК
 		</p>
 		`;
+	}
 
-		createDm(
-			{author: 'SLSFDKJS', content: 'Тест', date: {"minute":36,"hour":8,"day":12,"month":8,"year":2021}},
-			(elem) => {
-				document.querySelector('.box-content').appendChild(elem);
+	if(window.location.pathname == '/deruc-members') {
+		
+		ifDerucUser(() => {
+			document.querySelector('.box-head').innerHTML = `<h2>Участники ДеРуК</h2>`;
+			document.querySelector('.box-content').innerHTML = '';
+			let getreq = new XMLHttpRequest();
+			getreq.open("GET", "https://deruc.glitch.me/api/users", true);
+			getreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+			getreq.send();
+			getreq.onreadystatechange = function() {
+				if (getreq.readyState == 4 && getreq.status === 200) {
+					let jsonSelf;
+					try {
+						jsonSelf = JSON.parse(getreq.responseText);
+					} catch {
+						jsonSelf = null;
+					}
+
+					if(!jsonSelf) return;
+
+					jsonSelf.usernames.forEach(username => {
+						let userLink = document.createElement('a');
+						userLink.href = `/users/${username}`;
+
+						let userButton = document.createElement('button');
+						userButton.style.width = '340px';
+						userButton.style.display = 'inline-flex';
+						userButton.style.flexDirection = 'row-reverse';
+						userButton.style.justifyContent = 'center';
+						userButton.style.alignItems = 'center';
+						userButton.style.height = '50px';
+						userButton.innerText = username;
+						userLink.appendChild(userButton);
+
+						let userAvatar = document.createElement('img');
+						userAvatar.style.borderRadius = '8px';
+						userAvatar.style.marginRight = '10px';
+						userAvatar.style.setProperty('padding', '0', 'important');
+						userAvatar.height = 32;
+						userAvatar.width = 32;
+						getCachedProfileData(username, (json) => {
+							userAvatar.src = json.profile.images['32x32'];
+						});
+						userButton.appendChild(userAvatar);
+
+						document.querySelector('.box-content').appendChild(userLink);
+					});
+				}
+			}
 		});
+	}
+
+	if(window.location.href.includes('/accounts/settings')) {
+		if(document.querySelector('#change-country')) {
+			ifDerucUser((session) => {
+				document.querySelector('.box-content').innerHTML += `
+				<p><a href="#" id="derucDeleteAccount">Я хочу удалить аккаунт ДеРуК</a></p>`;
+				document.querySelector('#derucDeleteAccount').onclick = () => {
+					if(confirm('Вы действительно хотите удалить свой ДеРуК аккаунт? Ваш Скретч аккаунт НЕ будет удалён')) {
+						if(confirm('Вы уверены? Вся репутация которую вы накопили, личные сообщения и статусы будут потеряны')) {
+							if(confirm('У Вас есть последний шанс изменить свой мнение. Нажимая "ОК" вы понимаете и соглашайтесь с тем что ваш ДеРуК аккаунт будет удалён.')) {
+								let postreq = new XMLHttpRequest();
+								postreq.open("POST", "https://deruc.glitch.me/api/deleteAccount", true);
+								postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+								postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+								// send with our session in the request body
+								postreq.send(JSON.stringify({ session: session }));
+								postreq.onreadystatechange = () => {
+									if(postreq.status == 200) {
+										postreq.onreadystatechange = null;
+										alert('Аккаунт Удалён');
+										window.location.reload();
+									} else if(postreq.status == 403) {
+										alert('Ошибка, аккаунта не существует!');
+									} else if(postreq.status == 401) {
+										alert('Ошибка, отказано в доступе!');
+									}
+								}
+							} 
+						} 
+					} 
+				}
+			})
+		}
 	}
 }
 
@@ -649,6 +775,82 @@ function writeCommentBox () {
 	return done;
 }
 
+function news () {
+	ifDerucUser(() => {
+		let lastid = parseInt(localStorage.getItem('derucNewsLastId') || 0);
+	
+		let newsreq = new XMLHttpRequest();
+		newsreq.open("GET", "https://deruc.glitch.me/api/news?index=" + lastid, true);
+		newsreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		newsreq.send();
+		newsreq.onreadystatechange = () => {
+			if (newsreq.readyState != 4) return;
+	
+			let json;
+			try {
+				json = JSON.parse(newsreq.responseText);
+			} catch {
+				json = null;
+			}
+	
+			if(!json) return;
+	
+			let newsBox = document.createElement('div');
+			newsBox.style.position = 'fixed';
+			newsBox.style.zIndex = 999;
+			newsBox.style.bottom = '48px';
+			newsBox.style.left = '48px';
+			newsBox.style.width = '400px';
+			document.body.appendChild(newsBox);
+	
+			let maxid = 0;
+			json.forEach(news => {
+				if(news.id > maxid) maxid = news.id;
+	
+				let newsPiece = document.createElement('div');
+				newsPiece.style.padding = '16px';
+				newsPiece.style.background = 'white';
+				newsPiece.style.borderRadius = '5px';
+				newsPiece.style.boxShadow = '0 5px 15px rgba(0,0,0,.4)';
+				newsPiece.style.display = 'flex';
+				newsPiece.style.alignItems = 'flex-start';
+				newsPiece.style.marginTop = '20px';
+				newsBox.appendChild(newsPiece);
+				
+				let newsIcon = document.createElement('img');
+				newsIcon.src = 'https://cdn.glitch.com/3fd58b8e-4e75-48cd-b3a0-ace05055f727%2Fnews.png?v=1631646116099';
+				newsIcon.style.marginRight = '10px';
+				newsPiece.appendChild(newsIcon);
+	
+				let newsContent = document.createElement('div');
+				newsPiece.appendChild(newsContent);
+	
+				let newsHeading = document.createElement('h3');
+				newsHeading.style.color = '#222';
+				newsHeading.innerText = news.title;
+				newsContent.appendChild(newsHeading);
+	
+				let newsText = document.createElement('p');
+				newsText.style.color = '#333';
+				newsText.innerText = news.content;
+				newsContent.appendChild(newsText);
+	
+				let newsButton = document.createElement('button');
+				newsButton.classList.add('button');
+				newsButton.innerHTML = '<span>Прочитал</span>';
+				newsButton.onclick = () => { 
+					newsPiece.parentElement.removeChild(newsPiece); 
+					if(newsBox.innerHTML.trim() == '') 
+						newsBox.parentElement.removeChild(newsBox);
+				}
+				newsContent.appendChild(newsButton);
+			});
+	
+			localStorage.setItem('derucNewsLastId', maxid);
+		}
+	})
+}
+
 
 function compareTime(date) {
 	let currentDate = new Date();
@@ -701,6 +903,10 @@ function updateLastActive() {
 			if(json.bannedDeruc) {
 				alert('Вы забанены на ДеРуК. Большинство функций расширения будут недоступны');
 
+				return;
+			}
+
+			if(json.invisible) {
 				return;
 			}
 
@@ -1027,11 +1233,13 @@ if(navigator.userAgent.includes('Firefox')) {
 	staticPages();
 	createAccount();
 	userNav();
+	news();
 } else {
 	window.onload = () => {
 		updateProfile();
 		staticPages();
 		createAccount();
 		userNav();
+		news();
 	}
 }
