@@ -641,8 +641,28 @@ function commentDms (session) {
 			if(comment.querySelector('.content')) {
 				commentContent = comment.querySelector('.content');
 			}
-			else if(comment.querySelector('.emoji-text')) {
-				commentContent = comment.querySelector('.emoji-text');
+			else if(comment.querySelector('.emoji-text:last-child')) {
+				commentContent = comment.querySelector('.emoji-text:last-child');
+			}
+
+			let replyBtn = comment.querySelector('a.reply') || comment.querySelector('.comment-reply');
+			if(replyBtn && !replyBtn.classList.contains('deruc-reply-processed')) {
+				replyBtn.classList.add('deruc-reply-processed');
+				replyBtn.addEventListener('click', () => {
+					setTimeout(() => {
+						let newButton = document.createElement('button');
+						newButton.className = 'button compose-cancel small grey';
+						newButton.innerHTML = `<span> Добавить Изображение </span>`;
+						newButton.onclick = () => { addImage(comment.querySelector('textarea')); return false; };
+
+						if(comment.querySelector('.compose-bottom-row')) {
+							newButton.style.marginLeft = '2rem';
+							comment.querySelector('.compose-bottom-row').insertBefore(newButton, comment.querySelector('.compose-bottom-row').children[2]);
+						} else if(comment.querySelector('form'))
+							comment.querySelector('form').children[1].appendChild(newButton);
+							
+					}, 100);
+				});
 			}
 
 			if(commentContent.classList.contains('deruc-comment-processed')) return;
@@ -677,7 +697,7 @@ function commentDms (session) {
 						try { imgDecoded = atob(img) } catch { }
 
 						if(!imgDecoded) return;
-						checkImage(imgDecoded, (isValid) => {
+						checkImage(/*`https://deruc.sly-little-fox.workers.dev/?url=${encodeURIComponent(*/imgDecoded/*)}`*/, (isValid) => {
 							if(isValid) {
 								let imgElem = document.createElement('img');
 								imgElem.src = imgDecoded;
@@ -725,26 +745,7 @@ function writeCommentBox () {
 		}
 
 		document.querySelector('#derucAddImage').onclick = () => {
-			let url = prompt(
-				'Введите ссылку на изображение, которое хотите вставить. ' +
-				'Вот отличные места для хоста изображений: cubeupload.com, discord.com, imgbb.com'
-			);
-
-			checkImage(url, (isValid) => {
-				if(!isValid) return alert('Ошибка! Пожалуйста, введите правильный URL изображения!');
-
-				let commentInput = document.querySelector('#main-post-form textarea') || document.querySelector('#frc-compose-comment-3392903');
-				let inpCursor = commentInput.selectionStart;
-				commentInput.value = commentInput.value.slice(0, inpCursor) + 
-									 `:img[${btoa(url)}]:img` + 
-									 commentInput.value.slice(inpCursor, commentInput.value.length);
-
-				// indent
-				if(!window.location.href.includes('/users/'))
-					setTimeout(() => { 
-						alert('ВНИМАНИЕ! Перед тем как отправлять комментарий, измените как-то текст Вашего сообщения. Иначе, изображение, которое вы добавили не загрузится!');
-					}, 100);
-			});
+			addImage(document.querySelector('#main-post-form textarea') || document.querySelector('#frc-compose-comment-3392903'));
 		}
 	}
 
@@ -826,6 +827,116 @@ function news () {
 	})
 }
 
+function derucJam1(session) {
+	if(window.location.href.includes('/projects/')) {
+		if(document.querySelector('#derucJamBox')) return true;
+
+		let projInner = document.querySelector('.preview>.inner');
+		if(!projInner) return false;
+
+		let projName = document.querySelector('.project-title');
+		if(!projName || !projName.innerText) return true;
+
+		if(!projName.innerText.toLowerCase().includes('#derucjam1')) return true;
+
+		let projid = window.location.pathname.split('/')[2];
+
+		let getreq =  new XMLHttpRequest();
+		getreq.open("GET", "https://deruc.glitch.me/api/jam/votes?proj=" + projid, true);
+		getreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		getreq.send();
+		getreq.onreadystatechange = () => {
+			if(getreq.readyState == 4) {
+				if(getreq.status == 200) {
+					let data = [];
+					try {
+						data = JSON.parse(getreq.responseText);
+					} catch {}
+
+					let alreadyVoted = false
+					
+					if(data.includes(session.user.username.toLowerCase())) alreadyVoted = true;
+
+					let jamBox = document.createElement('div');
+					jamBox.id = 'derucJamBox';
+					jamBox.style.textAlign = 'left';
+					jamBox.style.padding = '15px 25px';
+					jamBox.style.marginTop = '10px';
+					jamBox.style.borderRadius = '5px';
+					jamBox.style.background = 'linear-gradient(58deg, #8034eb, #ff2b7c)';
+					jamBox.style.color = 'white';
+					jamBox.innerHTML = `
+					<h2>Этот проект принимает участие в ДеРуК Scratch Jam #1!</h2>
+					<p style="margin: 0">
+					${alreadyVoted ?
+					'Вы уже голосовали за этот проект. Если вы хотите убрать свой голос, нажмите на кнопку ниже.' :
+					'Если он вам понравился и вы хотите увидеть его в топе победителей, проголосуйте за него прямо сейчас!'}
+					</p>
+					<button id="derucJamVote" class="button" style="
+						margin: 10px 0;
+						color: #9233dc;
+						background: white;
+					">${alreadyVoted ? 'Убрать Голос' : 'Проголосовать'}</button>
+					`
+					projInner.appendChild(jamBox);
+
+					document.querySelector('#derucJamVote').onclick = () => {
+						let s = 'Вы уверены, что хотите проголосовать за этот проект? Советуем распоряжаться голосами умеренно, и не ставить их всем проектам подряд!';
+						if(alreadyVoted) s = 'Вы уверены, что хотите убрать голос за этот проект?'
+
+						if(confirm(s)) {
+							let postreq = new XMLHttpRequest();
+								postreq.open("POST", "https://deruc.glitch.me/api/jam/vote", true);
+								postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+								postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+								// send with our session in the request body
+								postreq.send(JSON.stringify({ 
+									session: session, 
+									proj: projid,
+									unvote: alreadyVoted
+								}));
+								postreq.onreadystatechange = () => {
+									if(postreq.readyState == 4) {
+										if(postreq.status == 200) {
+											jamBox.style.display = 'none';
+											alert('Готово!');
+										}
+										else if(postreq.status == 403) alert('Вы уже голосовали за этот проект');
+										else alert('Ошибка! Отказано в доступе');
+									}
+								}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return true;
+}
+
+
+function addImage(commentInput) {
+	let url = prompt(
+		'Введите ссылку на изображение, которое хотите вставить. ' +
+		'Вот отличные места для хоста изображений: cubeupload.com, discord.com, imgbb.com'
+	);
+
+	checkImage(url, (isValid) => {
+		if(!isValid) return alert('Ошибка! Пожалуйста, введите правильный URL изображения!');
+
+		let inpCursor = commentInput.selectionStart;
+		commentInput.value = commentInput.value.slice(0, inpCursor) + 
+							 `:img[${btoa(url)}]:img` + 
+							 commentInput.value.slice(inpCursor, commentInput.value.length);
+
+		// indent
+		if(!window.location.href.includes('/users/'))
+			setTimeout(() => { 
+				alert('ВНИМАНИЕ! Перед тем как отправлять комментарий, измените как-то текст Вашего сообщения. Иначе, изображение, которое вы добавили не загрузится!');
+			}, 100);
+	});
+}
 
 function compareTime(date) {
 	let currentDate = new Date();
@@ -1184,6 +1295,8 @@ setInterval(() => {updateLastActive()}, 60000);
 
 // check for user and if yes, update dm buttons
 ifDerucUser((session, user) => {
+	if(user.bannedDeruc) return;
+
 	let commentDmInterval = setInterval(() => {
 		let h = commentDms(session);
 		if(!h) {
@@ -1199,9 +1312,15 @@ ifDerucUser((session, user) => {
 			commentBoxInterval = null;
 		}
 	}, 2000);
-});
 
-//setTimeout(() => {updateProfile()}, 500);
+	let derucJamInterval = setInterval(() => {
+		let h = derucJam1(session);
+		if(h) {
+			clearInterval(derucJamInterval);
+			derucJamInterval = null;
+		}
+	}, 1000);
+});
 
 if(navigator.userAgent.includes('Firefox')) {
 	updateProfile();
