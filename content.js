@@ -866,8 +866,8 @@ function derucJam1(session) {
 					jamBox.style.background = 'linear-gradient(58deg, #8034eb, #ff2b7c)';
 					jamBox.style.color = 'white';
 					jamBox.innerHTML = `
-					<h2>Этот проект принимает участие в ДеРуК Scratch Jam #1!</h2>
-					<p style="margin: 0">
+					<h2 style="color: white">Этот проект принимает участие в ДеРуК Scratch Jam #1!</h2>
+					<p style="margin: 0; color: white">
 					${alreadyVoted ?
 					'Вы уже голосовали за этот проект. Если вы хотите убрать свой голос, нажмите на кнопку ниже.' :
 					'Если он вам понравился и вы хотите увидеть его в топе победителей, проголосуйте за него прямо сейчас!'}
