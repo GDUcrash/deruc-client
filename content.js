@@ -164,12 +164,36 @@ function updateProfile () {
 							!document.querySelector('#deruc-ban')
 						) {
 							//add a ban/unban button
-							document.querySelector('.footer').innerHTML = `
-							<div class="action" style="color: #777; font-size: 12px;
+							document.querySelector('.footer').insertAdjacentHTML('beforeend', `
+							<span class="action" style="color: #777; font-size: 12px;
 							position: absolute; right: 128px; top: 0px; cursor: pointer;">
 								<span class="text black" id="deruc-ban">${response.bannedDeruc ? 'Разбанить в DeRuC' : 'Забанить в DeRuC'}</span>
-							</div>
-							` + document.querySelector('.footer').innerHTML;
+							</span>
+							`);
+
+							//add ban reason
+							let getbaninfo = new XMLHttpRequest();
+				            getbaninfo.open("POST", "https://deruc.glitch.me/api/banInfo/" + username, true);
+			            	getbaninfo.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+			            	getbaninfo.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+			             	getbaninfo.send(JSON.stringify({ session: session }));
+			             	getbaninfo.onreadystatechange = function () {
+								if (getbaninfo.readyState != 4) return;
+								try {
+									baninfo = JSON.parse(getbaninfo.responseText).info;
+								} catch {
+									return
+								}
+								if(!(baninfo.moderator || baninfo.reason)) return;
+								document.querySelector('.footer').insertAdjacentHTML('afterbegin', `
+						    	<span class="action" style="color: #aa0033; font-size: 12px;
+							    position: relative">
+						   		    <span class="text black" id="deruc-ban-info">${baninfo.moderator ? 'Модератор: <a href="https://scratch.mit.edu/users/'
+									+ baninfo.moderator + '">' + baninfo.moderator + '</a>' : ''}${baninfo.moderator && baninfo.reason ? ' • ' : ''}
+									${baninfo.reason ? 'Причина: ' + baninfo.reason : ''}</span>
+							    </span>
+							    `);
+							}
 						}
 						if(self.role == 'admin' && response.role != 'admin' && !document.querySelector('#deruc-promote')) {
 							// add promote button
@@ -210,12 +234,18 @@ function updateProfile () {
 								if(response.bannedDeruc || confirm(`Вы действительно хотите забанить ${username}?` + 
 								' У них пропадёт доступ к большинству функциям ДеРуК, но они всё ещё смогут ' +
 								'взаимодействовать с другими в Скретче.')) {
+									if(!response.bannedDeruc) {
+										reason = prompt("Укажите причину. Она будет видна забаненному и другим модераторам.");
+									    if(reason === null) return; // nevermind
+									} else {
+										reason = null;
+									}
 									let postreq = new XMLHttpRequest();
 									postreq.open("POST", "https://deruc.glitch.me/api/ban", true);
 									postreq.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 									postreq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
 									// send with our session and target username in the request body
-									postreq.send(JSON.stringify({ session: session, target: username, unban: response.bannedDeruc }));
+									postreq.send(JSON.stringify({ session: session, target: username, unban: response.bannedDeruc, reason: reason }));
 									postreq.onreadystatechange = () => {
 										if(postreq.status == 200) {
 											postreq.onreadystatechange = null;
@@ -987,8 +1017,30 @@ function updateLastActive() {
 			}
 
 			if(json.bannedDeruc) {
-				alert('Вы забанены на ДеРуК. Большинство функций расширения будут недоступны');
-
+				let getbaninfo = new XMLHttpRequest();
+				getbaninfo.open("POST", "https://deruc.glitch.me/api/banInfo/" + session.user.username, true);
+				getbaninfo.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+				getbaninfo.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+				getbaninfo.send(JSON.stringify({ session: session }));
+				getbaninfo.onreadystatechange = function () {
+					if (getbaninfo.readyState != 4) return;
+					
+					let json;
+					try {
+						json = JSON.parse(getbaninfo.responseText);
+					} catch {
+						json = {};
+					}
+					if(json.info) {
+						let message = "Вы забанены на ДеРуК";
+						if(json.info.moderator) message += ` модератором ${json.info.moderator}`;
+						if(json.info.reason) message += `, причина: "${json.info.reason}"`;
+						message += ". Большинство функций расширения будут недоступны";
+						alert(message);
+					} else {
+				        alert('Вы забанены на ДеРуК. Большинство функций расширения будут недоступны');
+					}
+                }
 				return;
 			}
 
