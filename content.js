@@ -399,6 +399,29 @@ function staticPages () {
 		<li><a href="/deruc-members">Участники ДеРуК</a></li>`;
 	}
 
+	let derucChatInterval = setInterval(() => {
+		if(document.querySelector('.inner.logged-in>ul') || document.querySelector('.site-nav')) {
+			clearInterval(derucChatInterval);
+			derucChatInterval = null;
+
+			let derucChatNavbar = document.createElement('li');
+			derucChatNavbar.classList.add('link');
+			derucChatNavbar.classList.add('last');
+			derucChatNavbar.classList.add('derucChat');
+			derucChatNavbar.innerHTML = `<a href="/chat"><span>ДеРуК Чат</span></a>`;
+	
+			let nav = document.querySelector('.inner.logged-in>ul');
+			if(!nav) {
+				nav = document.querySelector('.site-nav');
+				try { document.querySelector('.site-nav>.last').classList.remove('last')} catch {}
+			}
+	
+			search = document.querySelector('.search');
+			if(document.querySelector('.site-nav')) return nav.appendChild(derucChatNavbar);
+			nav.insertBefore(derucChatNavbar, search);
+		}
+	}, 100);
+
 	if(window.location.pathname == '/dms') {
 		document.querySelector('.box-head').innerHTML = `<h2>Личные Сообщения</h2>`;
 
@@ -508,7 +531,8 @@ function staticPages () {
 	}
 
 	if(window.location.pathname == '/deruc-members') {
-		
+		document.querySelector('.box-head').style.display = 'block';
+		document.querySelector('.box-head').style.textAlign = 'center';
 		ifDerucUser(() => {
 			document.querySelector('.box-head').innerHTML = `<h2>Участники ДеРуК</h2>`;
 			document.querySelector('.box-content').innerHTML = '';
@@ -526,6 +550,8 @@ function staticPages () {
 					}
 
 					if(!jsonSelf) return;
+
+					document.querySelector('.box-head>h2').innerText += ` (${jsonSelf.usernames.length})`;
 
 					jsonSelf.usernames.forEach(username => {
 						let userLink = document.createElement('a');
